@@ -1,0 +1,2 @@
+[console_scripts]
+fds = financial_data_synthesizer.cli:main

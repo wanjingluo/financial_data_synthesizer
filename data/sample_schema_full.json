@@ -1,0 +1,53 @@
+{
+  "tables": [
+    {
+      "name": "customers",
+      "columns": [
+        { "name": "customer_id", "type": "string", "primary_key": true },
+        { "name": "name", "type": "string" },
+        { "name": "age", "type": "integer" },
+        { "name": "country", "type": "categorical", "categorical_values": ["US", "GB", "DE", "FR", "JP", "SG", "AU", "CA"] },
+        { "name": "profile_json", "type": "json" }
+      ]
+    },
+    {
+      "name": "accounts",
+      "columns": [
+        { "name": "account_id", "type": "string", "primary_key": true },
+        {
+          "name": "customer_id",
+          "type": "string",
+          "references_table": "customers",
+          "references_column": "customer_id"
+        },
+        {
+          "name": "account_type",
+          "type": "categorical",
+          "categorical_values": ["checking", "savings", "investment", "credit"]
+        },
+        { "name": "balance", "type": "float" },
+        { "name": "metadata_json", "type": "json" }
+      ]
+    },
+    {
+      "name": "transactions",
+      "columns": [
+        { "name": "transaction_id", "type": "string", "primary_key": true },
+        {
+          "name": "account_id",
+          "type": "string",
+          "references_table": "accounts",
+          "references_column": "account_id"
+        },
+        { "name": "amount", "type": "float" },
+        {
+          "name": "currency",
+          "type": "categorical",
+          "categorical_values": ["USD", "EUR", "GBP", "JPY", "SGD"]
+        },
+        { "name": "transaction_time", "type": "timestamp" },
+        { "name": "details_json", "type": "json" }
+      ]
+    }
+  ]
+}

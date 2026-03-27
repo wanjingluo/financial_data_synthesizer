@@ -1,0 +1,8 @@
+pandas>=2.0
+pyarrow>=14
+
+[delta]
+deltalake>=0.15
+
+[dev]
+pytest>=8

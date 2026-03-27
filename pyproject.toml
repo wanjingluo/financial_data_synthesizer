@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "financial-data-synthesizer"
+version = "0.1.0"
+description = "Synthetic financial data generator with schema generation and multi-format export"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas>=2.0",
+  "pyarrow>=14",
+]
+
+[project.optional-dependencies]
+delta = ["deltalake>=0.15"]
+faker = ["faker>=20"]
+sdv = ["sdv>=1.12", "faker>=20"]
+dev = ["pytest>=8", "faker>=20", "sdv>=1.12"]
+
+[project.scripts]
+fds = "financial_data_synthesizer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["financial_data_synthesizer*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: SDV fit/sample integration (seconds)"]
