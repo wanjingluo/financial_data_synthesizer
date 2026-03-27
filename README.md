@@ -129,13 +129,3 @@ fds generate --schema-json data/sample_schema_full.json --rows 1000 --parquet-di
 ## Example outputs
 
 Commands can write under `example/out/` (SQLite and per-table Parquet).
-
-## Mapping to the evaluation rubric
-
-| Area | What this project demonstrates |
-|------|--------------------------------|
-| Architecture (25%) | Layered modules, multiple inputs (SQL/JSON/scenario), pluggable exporters |
-| Data quality (25%) | Weighted categoricals, skewed amounts, FK consistency |
-| Engineering (20%) | Clear models, CLI, pytest |
-| Semi-structured (15%) | JSON templates and column-name heuristics |
-| Scalability (15%) | Batched SQLite export, optional batch iterator |
