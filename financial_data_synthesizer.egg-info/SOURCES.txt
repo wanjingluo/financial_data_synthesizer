@@ -1,14 +1,17 @@
+README.md
 pyproject.toml
 financial_data_synthesizer/__init__.py
 financial_data_synthesizer/__main__.py
 financial_data_synthesizer/cli.py
 financial_data_synthesizer/ddl.py
 financial_data_synthesizer/exporters.py
+financial_data_synthesizer/faker_bridge.py
 financial_data_synthesizer/json_values.py
 financial_data_synthesizer/models.py
 financial_data_synthesizer/parsers.py
 financial_data_synthesizer/scenario_templates.py
 financial_data_synthesizer/schema_from_scenario.py
+financial_data_synthesizer/sdv_integration.py
 financial_data_synthesizer/synthesis.py
 financial_data_synthesizer/topology.py
 financial_data_synthesizer.egg-info/PKG-INFO
@@ -17,5 +20,6 @@ financial_data_synthesizer.egg-info/dependency_links.txt
 financial_data_synthesizer.egg-info/entry_points.txt
 financial_data_synthesizer.egg-info/requires.txt
 financial_data_synthesizer.egg-info/top_level.txt
+tests/test_faker_sdv.py
 tests/test_parsers.py
 tests/test_synthesis.py

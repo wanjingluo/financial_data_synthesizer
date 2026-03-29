@@ -18,6 +18,7 @@ def export_sqlite(
     path: str | Path,
 ) -> None:
     path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         path.unlink()
     conn = sqlite3.connect(str(path))

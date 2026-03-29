@@ -93,7 +93,7 @@ Produces **readable single-column values** before the default RNG, driven by col
 fds generate --scenario crm --rows 80 --sdv-bootstrap --sdv-scale 1.5 --sqlite out/sdv.db
 
 # Train from an existing SQLite database
-fds generate --scenario crm --sdv-train-sqlite existing.db --sdv-scale 2 --sqlite out/sdv2.db
+fds generate --scenario crm --sdv-train-sqlite out/sdv.db --sdv-scale 2 --sqlite out/sdv2.db
 ```
 
 ## Dependencies

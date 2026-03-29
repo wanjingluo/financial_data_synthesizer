@@ -6,3 +6,12 @@ deltalake>=0.15
 
 [dev]
 pytest>=8
+faker>=20
+sdv>=1.12
+
+[faker]
+faker>=20
+
+[sdv]
+sdv>=1.12
+faker>=20

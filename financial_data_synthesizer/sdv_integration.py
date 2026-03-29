@@ -12,13 +12,26 @@ import pandas as pd
 
 def load_tables_from_sqlite(path: str | Path) -> dict[str, pd.DataFrame]:
     """Load every user table from SQLite into DataFrames (excludes sqlite_*)."""
-    path = Path(path)
+    path = Path(path).resolve()
+    if not path.exists():
+        raise FileNotFoundError(
+            f"SQLite training file not found: {path}. "
+            "Use an absolute path or run from the directory where the file lives. "
+            "If the path is wrong, SQLite would create an empty database and SDV would fail."
+        )
     conn = sqlite3.connect(str(path))
     try:
         cur = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
         )
         names = [r[0] for r in cur.fetchall()]
+        if not names:
+            raise ValueError(
+                f"No user tables in {path}. "
+                "Train on a database created with e.g. "
+                "'fds generate --scenario crm --sqlite your.db', "
+                "or verify the file is not empty/corrupt."
+            )
         out: dict[str, pd.DataFrame] = {}
         for n in names:
             out[n] = pd.read_sql_query(f'SELECT * FROM "{n}"', conn)
