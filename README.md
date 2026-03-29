@@ -1,6 +1,6 @@
 # Financial Data Synthesizer
 
-A **synthetic data generator** for financial-style workloads. It supports **Requirement 1** (derive a data model from a business scenario) and **Requirement 2** (generate configurable row counts from a given schema: SQLite DDL, internal JSON, or built-in scenarios), while aiming for plausible distributions, referential integrity, and semi-structured field shapes.
+A **synthetic data generator** for financial-style workloads. It supports derive a data model from a business scenario and generate configurable row counts from a given schema: SQLite DDL, internal JSON, or built-in scenarios, while aiming for plausible distributions, referential integrity, and semi-structured field shapes.
 
 ## Architecture
 
@@ -18,19 +18,19 @@ financial_data_synthesizer/
 └── cli.py                    # CLI entry point
 ```
 
-## Schema generation (Requirement 1)
+## Schema generation
 
 - **Built-in scenario templates** (aligned with Example Data Scenarios): `crm` (customers, accounts, transactions, interactions), `trading` (portfolios, instruments, orders, executions), `credit_risk` (borrowers, loans, repayments, risk snapshots).
 - Each table declares **primary** and **foreign keys** and mixes **numeric**, **categorical**, **timestamp**, and **JSON** columns.
 - Extensions: map free-text scenarios to templates (aliases), or feed an LLM-produced JSON schema into the same pipeline.
 
-## Synthetic data pipeline (Requirement 2)
+## Synthetic data pipeline
 
 1. **Input**: one of `--schema-sql`, `--schema-json`, or `--scenario`.
 2. **Topological order**: `topology.table_generation_order` ensures parents are generated before dependents.
 3. **Rows**: FK columns sample uniformly from the parent PK pool; amounts use lognormal / skewed draws; categoricals use weights or `categorical_values`.
 4. **JSON**: `json_values.synthetic_json_for_column` builds stable nested payloads from column/table hints (e.g. profile, metadata, transaction details).
-5. **Output**: `export_sqlite` (batched inserts), `export_parquet_dir` (per-table files), `export_delta` (optional: `pip install deltalake`).
+5. **Output** (only if you pass the matching CLI flags): `export_sqlite` (batched inserts), `export_parquet_dir` (per-table files), `export_delta` (optional: `pip install deltalake`). See **CLI output** below.
 
 ## Distributions and relationships
 
@@ -48,7 +48,7 @@ financial_data_synthesizer/
 - SQLite export uses **10k-row batches** with `executemany`.
 - For very large runs, use `SyntheticDataGenerator.iter_batches` per table (you must keep parent PK pools consistent yourself).
 
-## Faker and SDV (optional)
+## Faker and SDV
 
 Install: `pip install -e ".[faker]"` or `pip install -e ".[sdv]"` (includes `sdv` and `faker`).
 
@@ -110,22 +110,34 @@ python -m pytest tests -q
 python -m pytest tests -q -m "not slow"
 ```
 
+## CLI output (`--sqlite` and `--parquet-dir`)
+
+- **`--sqlite PATH`**: optional. If omitted, **no `.db` file is written**—data exists only in memory for that run.
+- **`--parquet-dir DIR`**: optional. If omitted, **no Parquet files are written**—previous files in that folder are **not** updated.
+- The two flags are **independent**: use **both** in one command if you want a SQLite database **and** per-table Parquet under `DIR`. Passing only one writes only that format.
+- If **neither** `--sqlite` nor `--parquet-dir` is given, the CLI **only prints** each table’s row count to the terminal (**nothing is saved** to disk).
+
+Parent directories (e.g. `out/`) are created automatically when writing.
+
 ## CLI examples
 
 ```bash
-# Built-in CRM scenario
+# Built-in CRM scenario — SQLite + Parquet
 fds generate --scenario crm --rows 200 --sqlite out/crm.db --parquet-dir out/pq
 
-# Faker for more human-readable fields
-fds generate --scenario crm --rows 100 --use-faker --sqlite out/crm_faker.db
+# Faker — same: add --parquet-dir if you want Parquet updated (SQLite alone does not write Parquet)
+fds generate --scenario crm --rows 100 --use-faker --sqlite out/crm_faker.db --parquet-dir out/pq
 
 # sample_schema.sql (includes transactions)
 fds generate --schema-sql data/sample_schema.sql --rows 500 --sqlite out/sample.db
 
 # sample_schema_full.json (FK metadata)
 fds generate --schema-json data/sample_schema_full.json --rows 1000 --parquet-dir out/pq
+
+# No files — only print row counts to stdout
+fds generate --scenario crm --rows 50
 ```
 
 ## Example outputs
 
-Commands can write under `example/out/` (SQLite and per-table Parquet).
+With `--sqlite` / `--parquet-dir`, outputs go to the paths you pass (e.g. `out/*.db` and `out/pq/*.parquet`).

@@ -56,8 +56,16 @@ def main(argv: list[str] | None = None) -> int:
         default=1.0,
         help="SDV sample scale vs training row counts (HMA multiplies each table by ~scale)",
     )
-    g.add_argument("--sqlite", type=Path, help="Write SQLite database to this path")
-    g.add_argument("--parquet-dir", type=Path, help="Write one Parquet file per table")
+    g.add_argument(
+        "--sqlite",
+        type=Path,
+        help="Optional. Write SQLite database to this path. If omitted, no .db file is saved.",
+    )
+    g.add_argument(
+        "--parquet-dir",
+        type=Path,
+        help="Optional. Write one Parquet file per table under this directory. If omitted, no Parquet files are written.",
+    )
 
     args = p.parse_args(argv)
 
