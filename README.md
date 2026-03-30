@@ -131,8 +131,8 @@ fds generate --scenario crm --rows 200 --sqlite out/crm.db --parquet-dir out/pq
 # Faker — same: add --parquet-dir if you want Parquet updated (SQLite alone does not write Parquet)
 fds generate --scenario crm --rows 100 --use-faker --sqlite out/crm_faker.db --parquet-dir out/pq
 
-# sample_schema.sql (includes transactions)
-fds generate --schema-sql data/sample_schema.sql --rows 500 --sqlite out/sample.db
+# sample_schema.sql (includes transactions) + CRM business rules (optional)
+fds generate --schema-sql data/sample_schema.sql --business-rules-as crm --rows 500 --sqlite out/sample.db --parquet-dir out/pq_schema
 
 # sample_schema_full.json (FK metadata)
 fds generate --schema-json data/sample_schema_full.json --rows 1000 --parquet-dir out/pq
@@ -153,7 +153,8 @@ When you pass **`--scenario`**, a **deterministic rule engine** runs after base 
 
 **CLI**
 
-- **Default**: rules **on** for `--scenario crm|trading|credit_risk`.
+- **Default**: rules **on** when you use **`--scenario crm|trading|credit_risk`**.
+- **`--business-rules-as crm|trading|credit_risk`**: apply the same engine when using **`--schema-sql` or `--schema-json`** (no `--scenario`). Example: `--schema-sql data/sample_schema.sql --business-rules-as crm`.
 - **`--no-business-rules`**: skip the engine and keep raw generator (± Faker) output only.
 
 **Where it lives**
@@ -193,4 +194,6 @@ When you pass **`--scenario`**, a **deterministic rule engine** runs after base 
 - Add or edit rules in the scenario modules; register keys in `business_rules/engine.py`.
 - For **AI / LLM**-driven logic later, keep the same post-process hook: call your model from a new rule module and merge outputs into row dicts (still subject to schema types).
 
-**Note**: `--schema-sql` / `--schema-json` without `--scenario` does **not** run this engine (no scenario key). Use `--scenario` to activate rules, or call `apply_business_rules(name, tables, seed)` from Python.
+**Note**: With only `--schema-sql` / `--schema-json` and **no** `--scenario`, rules **do not** run unless you add **`--business-rules-as crm`** (or `trading` / `credit_risk`). You can also call `apply_business_rules(name, tables, seed)` from Python.
+
+**DDL / TEXT columns**: SQLite `TEXT` columns such as `currency` and `account_type` are parsed as `STRING`s. The generator maps known code-like column names to **ISO codes / account types** (not random letters). **`ticker` / `symbol`** (e.g. on `instruments`) are filled with **uppercase ticker-like symbols** (pool of stylized names + random A–Z runs), not mixed-case gibberish. Use **`--use-faker`** for similar semantics on those fields.

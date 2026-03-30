@@ -52,6 +52,12 @@ class FakerBridge:
         if n in ("country", "country_code", "region"):
             return self._fake.country_code()
 
+        # DDL often uses TEXT for codes; same as synthesis._categorical lists
+        if n == "currency" or "currency" in n:
+            return self._fake.random_element(["USD", "EUR", "GBP", "JPY", "SGD"])
+        if n == "account_type" or n.endswith("_account_type"):
+            return self._fake.random_element(["checking", "savings", "investment", "credit"])
+
         if col.kind == ColumnKind.INTEGER:
             if n in ("age",):
                 return self._fake.random_int(min=18, max=85)

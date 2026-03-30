@@ -71,6 +71,13 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Disable the scenario rule engine (entity/lifecycle/cross-field business logic).",
     )
+    g.add_argument(
+        "--business-rules-as",
+        metavar="SCENARIO",
+        choices=["crm", "trading", "credit_risk"],
+        default=None,
+        help="Apply business rules for this built-in scenario when using --schema-sql or --schema-json (no built-in scenario). Ignored if --scenario is set.",
+    )
 
     args = p.parse_args(argv)
 
@@ -112,10 +119,11 @@ def main(argv: list[str] | None = None) -> int:
         gen = SyntheticDataGenerator(schema, cfg)
         tables = gen.generate_tables()
 
-    if args.scenario and not args.no_business_rules:
+    rule_scenario = args.scenario or args.business_rules_as
+    if rule_scenario and not args.no_business_rules:
         from .business_rules import apply_business_rules
 
-        tables = apply_business_rules(args.scenario, tables, args.seed)
+        tables = apply_business_rules(rule_scenario, tables, args.seed)
 
     if args.sqlite:
         export_sqlite(schema, tables, args.sqlite)

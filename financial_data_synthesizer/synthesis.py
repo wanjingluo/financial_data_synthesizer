@@ -23,6 +23,34 @@ def _skewed_amount(rng: random.Random, mean: float = 120.0, sigma: float = 1.2) 
     return round(math.exp(rng.normalvariate(math.log(mean), sigma)) * (0.5 + rng.random()), 2)
 
 
+def _ticker_symbol(rng: random.Random) -> str:
+    """Exchange-style tickers: mostly recognizable-style symbols, not random mixed-case noise."""
+    pool = (
+        "AAPL",
+        "MSFT",
+        "GOOGL",
+        "AMZN",
+        "META",
+        "JPM",
+        "BAC",
+        "XOM",
+        "SPY",
+        "QQQ",
+        "EURUSD",
+        "GBPUSD",
+        "USDJPY",
+        "GLD",
+        "USO",
+        "TSLA",
+        "NVDA",
+        "V",
+    )
+    if rng.random() < 0.65:
+        return rng.choice(pool)
+    k = rng.randint(3, 5)
+    return "".join(rng.choices(string.ascii_uppercase, k=k))
+
+
 def _age(rng: random.Random) -> int:
     v = int(rng.normalvariate(42, 14))
     return max(18, min(95, v))
@@ -153,6 +181,17 @@ class SyntheticDataGenerator:
         if k == ColumnKind.STRING:
             if col.name.lower() == "name":
                 return f"{rng.choice(['Alex','Sam','Jordan','Casey'])} {rng.choice(['Lee','Pat','Ng','Wu'])}"
+            # DDL often uses TEXT for codes (currency, country, account_type). Do not use random letters.
+            nl = col.name.lower()
+            if "ticker" in nl or nl in ("symbol",) or nl.endswith("_symbol"):
+                return _ticker_symbol(rng)
+            if (
+                "currency" in nl
+                or "country" in nl
+                or "account_type" in nl
+                or nl in ("channel", "status", "side", "region", "account_type")
+            ):
+                return self._categorical(tname, col.name, rng)
             return "".join(rng.choices(string.ascii_letters, k=rng.randint(6, 14)))
 
         return None
