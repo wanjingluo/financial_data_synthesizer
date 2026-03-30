@@ -14,6 +14,7 @@ financial_data_synthesizer/
 ├── json_values.py            # Domain-style JSON column templates
 ├── faker_bridge.py           # Optional Faker: names, contacts, categories
 ├── sdv_integration.py        # Optional SDV HMA: multi-table fit & resample
+├── business_rules/           # Scenario rule engine (entity, lifecycle, cross-field)
 ├── exporters.py              # SQLite / Parquet / Delta (optional)
 └── cli.py                    # CLI entry point
 ```
@@ -119,6 +120,8 @@ python -m pytest tests -q -m "not slow"
 
 Parent directories (e.g. `out/`) are created automatically when writing.
 
+- With **`--scenario`**, the **business rule engine** runs before export unless **`--no-business-rules`** is set (see [Business rule engine](#business-rule-engine-built-in-scenarios) at the end of this file).
+
 ## CLI examples
 
 ```bash
@@ -141,3 +144,53 @@ fds generate --scenario crm --rows 50
 ## Example outputs
 
 With `--sqlite` / `--parquet-dir`, outputs go to the paths you pass (e.g. `out/*.db` and `out/pq/*.parquet`).
+
+---
+
+## Business rule engine (built-in scenarios)
+
+When you pass **`--scenario`**, a **deterministic rule engine** runs after base generation (and after SDV, if used). It rewrites / enriches fields so rows reflect simple **entity identity**, **lifecycle**, **cross-field**, and **product** logic—without changing primary/foreign keys (referential integrity is preserved).
+
+**CLI**
+
+- **Default**: rules **on** for `--scenario crm|trading|credit_risk`.
+- **`--no-business-rules`**: skip the engine and keep raw generator (± Faker) output only.
+
+**Where it lives**
+
+- `financial_data_synthesizer/business_rules/engine.py` — dispatches by scenario.
+- `crm_rules.py`, `trading_rules.py`, `credit_risk_rules.py` — scenario-specific rules.
+
+### CRM (`crm`)
+
+| Theme | Rules (summary) |
+|--------|-------------------|
+| **Entity identity** | Each customer gets `entity_type` ∈ {retail, corporate} and `segment` in `profile_json`; corporate skews toward higher tiers. |
+| **Customer lifecycle** | `lifecycle_stage` ∈ {onboarding, active, growth, at_risk, dormant}; drives KYC status, balance scaling, and interaction channel mix. |
+| **Cross-field** | `account_type` and `balance` depend on entity + lifecycle + tier; `metadata_json` carries `product_line` (commercial vs retail) and `fee_tier`. |
+| **Transactions** | `amount` scales with account balance and lifecycle (e.g. stress in at_risk); `currency` mix differs for corporate vs retail; `details_json` adds posting/risk flags. |
+| **Interactions** | `channel` distribution shifts by lifecycle (e.g. more phone when at_risk); `summary_json` adds intent/priority. |
+
+### Trading (`trading`)
+
+| Theme | Rules (summary) |
+|--------|-------------------|
+| **Product / instrument** | `quantity` and `limit_price` ranges depend on `asset_class` (equity vs fx vs bond vs commodity). |
+| **Portfolio** | `attrs_json` includes routing hint; execution currency context uses portfolio `base_currency`. |
+| **Executions** | `fill_price` stays near order `limit_price`; `fill_qty` ≤ order quantity; `details_json` adds slippage_bps. |
+
+### Credit risk (`credit_risk`)
+
+| Theme | Rules (summary) |
+|--------|-------------------|
+| **Borrower** | `profile_json` adds employment stability; mild regional income floor for selected regions. |
+| **Loan contracts** | Principal capped vs annual income (rough DTI-style); rate nudges up when leverage is high; `contract_json` adds product_family and underwriting_band. |
+| **Repayment** | Paid amount bounded by principal; status may move missed→late; collections_stage in `details_json`. |
+| **Risk indicators** | `pd` / `lgd` adjusted with payment-to-income proxy; `features_json` stores `pti` and model tag. |
+
+**Extending**
+
+- Add or edit rules in the scenario modules; register keys in `business_rules/engine.py`.
+- For **AI / LLM**-driven logic later, keep the same post-process hook: call your model from a new rule module and merge outputs into row dicts (still subject to schema types).
+
+**Note**: `--schema-sql` / `--schema-json` without `--scenario` does **not** run this engine (no scenario key). Use `--scenario` to activate rules, or call `apply_business_rules(name, tables, seed)` from Python.

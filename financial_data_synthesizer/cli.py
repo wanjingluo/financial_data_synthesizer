@@ -66,6 +66,11 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="Optional. Write one Parquet file per table under this directory. If omitted, no Parquet files are written.",
     )
+    g.add_argument(
+        "--no-business-rules",
+        action="store_true",
+        help="Disable the scenario rule engine (entity/lifecycle/cross-field business logic).",
+    )
 
     args = p.parse_args(argv)
 
@@ -106,6 +111,11 @@ def main(argv: list[str] | None = None) -> int:
     else:
         gen = SyntheticDataGenerator(schema, cfg)
         tables = gen.generate_tables()
+
+    if args.scenario and not args.no_business_rules:
+        from .business_rules import apply_business_rules
+
+        tables = apply_business_rules(args.scenario, tables, args.seed)
 
     if args.sqlite:
         export_sqlite(schema, tables, args.sqlite)
