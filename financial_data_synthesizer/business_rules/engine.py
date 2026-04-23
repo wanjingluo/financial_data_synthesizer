@@ -10,6 +10,8 @@ _RULES: dict[str, RuleFn] = {
     "crm": crm_rules.apply_crm_rules,
     "trading": trading_rules.apply_trading_rules,
     "credit_risk": credit_risk_rules.apply_credit_risk_rules,
+    "banking": crm_rules.apply_crm_rules,
+    "client_coverage": crm_rules.apply_crm_rules,
 }
 
 
@@ -25,6 +27,11 @@ def normalize_scenario_key(name: str) -> str:
         "scenario_3": "credit_risk",
         "scenario3": "credit_risk",
         "credit": "credit_risk",
+        "bank": "banking",
+        "retail_banking": "banking",
+        "rm_kyc": "client_coverage",
+        "primary_rm": "client_coverage",
+        "wealth": "client_coverage",
     }
     return aliases.get(k, k)
 

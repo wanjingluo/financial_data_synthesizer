@@ -32,7 +32,10 @@ def main(argv: list[str] | None = None) -> int:
     g = sub.add_parser("generate", help="Generate synthetic data from a schema file")
     g.add_argument("--schema-sql", type=Path, help="Path to SQLite-style DDL")
     g.add_argument("--schema-json", type=Path, help="Path to internal JSON schema")
-    g.add_argument("--scenario", help="Built-in scenario: crm | trading | credit_risk")
+    g.add_argument(
+        "--scenario",
+        help="Built-in scenario: crm | trading | credit_risk | banking | client_coverage",
+    )
     g.add_argument("--rows", type=int, default=1000, help="Default rows per table (base generator / SDV bootstrap)")
     g.add_argument(
         "--rows-map",
@@ -74,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument(
         "--business-rules-as",
         metavar="SCENARIO",
-        choices=["crm", "trading", "credit_risk"],
+        choices=["crm", "trading", "credit_risk", "banking", "client_coverage"],
         default=None,
         help="Apply business rules for this built-in scenario when using --schema-sql or --schema-json (no built-in scenario). Ignored if --scenario is set.",
     )

@@ -14,14 +14,14 @@ financial_data_synthesizer/
 ├── json_values.py            # Domain-style JSON column templates
 ├── faker_bridge.py           # Optional Faker: names, contacts, categories
 ├── sdv_integration.py        # Optional SDV HMA: multi-table fit & resample
-├── business_rules/           # Scenario rule engine (entity, lifecycle, cross-field)
+├── business_rules/           # engine.py + trading/credit_risk; CRM/banking/RM-KYC in crm_rules.py
 ├── exporters.py              # SQLite / Parquet / Delta (optional)
 └── cli.py                    # CLI entry point
 ```
 
 ## Schema generation
 
-- **Built-in scenario templates** (aligned with Example Data Scenarios): `crm` (customers, accounts, transactions, interactions), `trading` (portfolios, instruments, orders, executions), `credit_risk` (borrowers, loans, repayments, risk snapshots).
+- **Built-in scenario templates** (aligned with Example Data Scenarios): `crm` — full **unified** retail + relationship dataset: `customers`, `accounts`, `transactions`, `customer_interactions`, `relationship_managers`, `client_accounts` (KYC + Primary RM; PK `serving_account_id`, FK `customer_id` → `customers`), `coverage_assignments` (FK `serving_account_id` → `client_accounts`). The same schema is also registered as **`client_coverage`** (alias). Other scenarios: `trading` (portfolios, instruments, orders, executions), `credit_risk` (borrowers, loans, repayments, risk snapshots), `banking` (customers, `bank_accounts`, `account_status_history` chain).
 - Each table declares **primary** and **foreign keys** and mixes **numeric**, **categorical**, **timestamp**, and **JSON** columns.
 - Extensions: map free-text scenarios to templates (aliases), or feed an LLM-produced JSON schema into the same pipeline.
 
@@ -139,6 +139,11 @@ fds generate --schema-json data/sample_schema_full.json --rows 1000 --parquet-di
 
 # No files — only print row counts to stdout
 fds generate --scenario crm --rows 50
+
+# Banking (ordered status history) — separate scenario
+fds generate --scenario banking --rows 100 --seed 42 --sqlite out/banking.db
+# `client_coverage` is the same schema as `crm` (alias); use `crm` for “all user tables” in one run
+fds generate --scenario crm --rows 200 --sqlite out/crm.db --parquet-dir out/pq
 ```
 
 ## Example outputs
@@ -149,28 +154,43 @@ With `--sqlite` / `--parquet-dir`, outputs go to the paths you pass (e.g. `out/*
 
 ## Business rule engine (built-in scenarios)
 
-When you pass **`--scenario`**, a **deterministic rule engine** runs after base generation (and after SDV, if used). It rewrites / enriches fields so rows reflect simple **entity identity**, **lifecycle**, **cross-field**, and **product** logic—without changing primary/foreign keys (referential integrity is preserved).
+When you pass **`--scenario`**, a **deterministic rule engine** runs after base generation (and after SDV, if used). It rewrites / enriches fields so rows reflect **entity identity**, **lifecycle**, **cross-field**, **product**, and (where defined) **coverage / KYC** logic—without changing primary/foreign keys (referential integrity is preserved).
 
 **CLI**
 
-- **Default**: rules **on** when you use **`--scenario crm|trading|credit_risk`**.
-- **`--business-rules-as crm|trading|credit_risk`**: apply the same engine when using **`--schema-sql` or `--schema-json`** (no `--scenario`). Example: `--schema-sql data/sample_schema.sql --business-rules-as crm`.
+- **Default**: rules **on** when you use **`--scenario crm|trading|credit_risk|banking|client_coverage`**.
+- **`--business-rules-as crm|trading|credit_risk|banking|client_coverage`**: apply the same engine when using **`--schema-sql` or `--schema-json`** (no `--scenario`). Example: `--schema-sql data/sample_schema.sql --business-rules-as crm`.
 - **`--no-business-rules`**: skip the engine and keep raw generator (± Faker) output only.
 
 **Where it lives**
 
 - `financial_data_synthesizer/business_rules/engine.py` — dispatches by scenario.
-- `crm_rules.py`, `trading_rules.py`, `credit_risk_rules.py` — scenario-specific rules.
+- `crm_rules.py` — **CRM** (including **Primary RM** + `is_servicing_eligible` when `client_accounts` + `relationship_managers` are present; always true for `--scenario crm` / `client_coverage`), and **banking** (status history when `bank_accounts` is present); trading/credit are separate.
+- `trading_rules.py`, `credit_risk_rules.py` — trading and credit-risk-only logic.
 
-### CRM (`crm`)
+**Implementation vs. checking exports**
+
+- **Enforcing rules in-process:** `cli.py` calls `apply_business_rules(...)` after `generate_tables` (unless `--no-business-rules`). CRM / RM+KYC logic is implemented in `business_rules/crm_rules.py` (e.g. `_apply_client_coverage_kyc`, `_compute_is_servicing_eligible`), not as DB CHECK constraints.
+- **Re-validating Parquet (or any export) after the fact:** `scripts/validate_pq_crm.py` reads `client_accounts.parquet` and `coverage_assignments.parquet` and checks the same Primary-RM and `is_servicing_eligible` predicates. **`tests/test_business_rules.py`** covers the engine on in-memory dicts. **`notebooks/pq_crm_quicklook.ipynb`** is for ad-hoc Pandas checks.
+
+### CRM (`crm`) — includes retail + RM / KYC (same as alias `client_coverage`)
 
 | Theme | Rules (summary) |
 |--------|-------------------|
 | **Entity identity** | Each customer gets `entity_type` ∈ {retail, corporate} and `segment` in `profile_json`; corporate skews toward higher tiers. |
-| **Customer lifecycle** | `lifecycle_stage` ∈ {onboarding, active, growth, at_risk, dormant}; drives KYC status, balance scaling, and interaction channel mix. |
+| **Customer lifecycle** | `lifecycle_stage` ∈ {onboarding, active, growth, at_risk, dormant}; drives balance scaling and interaction channel mix. (KYC for servicing is on `client_accounts`, not in `profile_json`.) |
 | **Cross-field** | `account_type` and `balance` depend on entity + lifecycle + tier; `metadata_json` carries `product_line` (commercial vs retail) and `fee_tier`. |
 | **Transactions** | `amount` scales with account balance and lifecycle (e.g. stress in at_risk); `currency` mix differs for corporate vs retail; `details_json` adds posting/risk flags. |
 | **Interactions** | `channel` distribution shifts by lifecycle (e.g. more phone when at_risk); `summary_json` adds intent/priority. |
+| **Primary RM** | `client_accounts` + `coverage_assignments`: for `account_status = Active`, exactly one **Primary** row; `coverage_owner_id` matches. Optional `Product_Shared` / `Regional_Shared`. **IDs:** `serving_account_id` (serving/relationship line) vs `accounts.account_id` (retail product accounts). |
+| **Servicing eligibility** | `is_servicing_eligible` on `client_accounts` from KYC + `kyc_expiry_date` + `sanctions_status` (as-of: env **`FDS_AS_OF_DATE`** or UTC today). |
+
+### Banking (`banking`) — also implemented in `crm_rules.py`
+
+| Theme | Rules (summary) |
+|--------|-------------------|
+| **Status history** | `account_status_history` is **rebuilt** with a time-ordered Markov chain per `account_id` (first event `opened`; each next status depends on the previous). |
+| **Current state** | `bank_accounts.current_status` = last event; `metadata_json` flags terminal `closed` when applicable. |
 
 ### Trading (`trading`)
 
@@ -191,9 +211,13 @@ When you pass **`--scenario`**, a **deterministic rule engine** runs after base 
 
 **Extending**
 
-- Add or edit rules in the scenario modules; register keys in `business_rules/engine.py`.
-- For **AI / LLM**-driven logic later, keep the same post-process hook: call your model from a new rule module and merge outputs into row dicts (still subject to schema types).
+- Add or edit rules in `crm_rules.py` (shared CRM / banking / client-coverage paths) or in `trading_rules.py` / `credit_risk_rules.py`; register new scenario keys in `business_rules/engine.py`.
+- For **AI / LLM**-driven logic later, keep the same post-process hook: call your model from a rule function and merge outputs into row dicts (still subject to schema types).
 
-**Note**: With only `--schema-sql` / `--schema-json` and **no** `--scenario`, rules **do not** run unless you add **`--business-rules-as crm`** (or `trading` / `credit_risk`). You can also call `apply_business_rules(name, tables, seed)` from Python.
+**Note**: With only `--schema-sql` / `--schema-json` and **no** `--scenario`, rules **do not** run unless you add **`--business-rules-as`** with a known scenario (`crm`, `trading`, `credit_risk`, `banking`, `client_coverage`, …). You can also call `apply_business_rules(name, tables, seed)` from Python.
 
 **DDL / TEXT columns**: SQLite `TEXT` columns such as `currency` and `account_type` are parsed as `STRING`s. The generator maps known code-like column names to **ISO codes / account types** (not random letters). **`ticker` / `symbol`** (e.g. on `instruments`) are filled with **uppercase ticker-like symbols** (pool of stylized names + random A–Z runs), not mixed-case gibberish. Use **`--use-faker`** for similar semantics on those fields.
+
+---
+
+*Last updated: 2026-04 — Documented “implementation vs. post-export validation” (`crm_rules` vs `scripts/validate_pq_crm.py` / tests / notebook). `--scenario crm` = unified schema; `client_coverage` = alias; `engine` dispatches to `apply_crm_rules` for `crm` / `client_coverage` / `banking` as applicable.*

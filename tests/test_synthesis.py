@@ -36,3 +36,14 @@ def test_json_columns_are_strings():
     tables = gen.generate_tables()
     prof = tables["customers"][0]["profile_json"]
     assert isinstance(prof, str) and prof.startswith("{")
+
+
+def test_relationship_managers_full_name_looks_like_person():
+    from financial_data_synthesizer.schema_from_scenario import schema_for_scenario
+
+    schema = schema_for_scenario("crm")
+    gen = SyntheticDataGenerator(schema, GenerationConfig(seed=101, default_rows=4))
+    tables = gen.generate_tables()
+    for row in tables["relationship_managers"]:
+        fn = row["full_name"]
+        assert isinstance(fn, str) and " " in fn.strip() and len(fn) > 2

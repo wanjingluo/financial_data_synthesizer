@@ -89,6 +89,23 @@ class SyntheticDataGenerator:
             from .faker_bridge import FakerBridge
 
             self._faker = FakerBridge(self.config.seed)
+        # Lazy Faker for `full_name` when `--use-faker` is off (optional dep `faker`)
+        self._lazy_name_faker: Any = None
+
+    def _name_faker_instance(self) -> Any:
+        """One shared Faker for realistic `full_name`; False if `faker` is not installed."""
+        if self._lazy_name_faker is not None:
+            return self._lazy_name_faker
+        try:
+            from faker import Faker
+
+            f = Faker("en_US")
+            f.seed_instance(self.config.seed)
+            self._lazy_name_faker = f
+            return f
+        except ImportError:
+            self._lazy_name_faker = False
+            return False
 
     def _build_categorical_defaults(self) -> dict[tuple[str, str], list[str]]:
         d: dict[tuple[str, str], list[str]] = {}
@@ -179,10 +196,15 @@ class SyntheticDataGenerator:
         if k == ColumnKind.BOOLEAN:
             return rng.random() < 0.5
         if k == ColumnKind.STRING:
-            if col.name.lower() == "name":
+            nl = col.name.lower()
+            if nl == "full_name":
+                f_inst = self._name_faker_instance()
+                if f_inst:
+                    return f_inst.name()
+                return f"{rng.choice(['Alex', 'Sam', 'Jordan', 'Casey'])} {rng.choice(['Lee', 'Pat', 'Ng', 'Wu'])}"
+            if nl == "name":
                 return f"{rng.choice(['Alex','Sam','Jordan','Casey'])} {rng.choice(['Lee','Pat','Ng','Wu'])}"
             # DDL often uses TEXT for codes (currency, country, account_type). Do not use random letters.
-            nl = col.name.lower()
             if "ticker" in nl or nl in ("symbol",) or nl.endswith("_symbol"):
                 return _ticker_symbol(rng)
             if (

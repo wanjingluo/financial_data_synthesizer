@@ -27,7 +27,6 @@ def synthetic_json_for_column(
                 ["email", "sms", "app_push", "phone"],
                 k=rng.randint(1, 3),
             ),
-            "kyc_status": _pick(rng, ["verified", "pending", "expired"]),
         }
     elif "metadata" in name_l:
         obj = {
